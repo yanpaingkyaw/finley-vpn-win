@@ -19,9 +19,9 @@ test('parses percent encoded plain credentials', () => {
 test('rejects invalid and unsupported access keys', () => {
  for (const key of ['https://example.com/config','ssconf://example.com','ss://invalid','ss://aes-256-gcm:pw@host:99999','ss://rc4:pw@host:443','ss://aes-256-gcm:pw@host:443/?plugin=test']) assert.throws(() => parseKey(key));
 });
-test('missing engine never reports a connection', async () => {
+test('missing service client never reports a connection', async () => {
  const n = createNetworkController();
- await assert.rejects(n.connect(), /VPN engine or Windows helper is missing|only on Windows/);
+ await assert.rejects(n.connect(), /Service is unavailable/);
  assert.equal(n.getStatus().state, 'disconnected');
  assert.equal((await n.disconnect()).state, 'disconnected');
 });

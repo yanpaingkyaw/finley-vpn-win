@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const net = require('node:net');
-const { probeSocks } = require('../electron/network.cjs');
+const { probeSocks } = require('./network-reference.cjs');
 test('probe rejects an unauthenticated or broken proxy without treating it as connected', async () => {
  const server = net.createServer(socket => socket.once('data', () => socket.end(Buffer.from([5,255]))));
  await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));

@@ -1,14 +1,16 @@
 {
   "name": "finley-vpn",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "description": "Finley Windows VPN client",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env FINLEY_DEV_URL=http://127.0.0.1:5173 electron .\"",
     "build": "tsc --noEmit && vite build",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File native/build-service.ps1",
     "test": "node --test tests/*.test.cjs",
-    "dist": "npm run build && electron-builder --win nsis --x64"
+    "test:native": "npm run build:native && node --test tests/service-native.test.cjs",
+    "dist": "npm run build:native && npm test && npm run build && electron-builder --win nsis --x64"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -30,18 +32,26 @@
   "build": {
     "appId": "app.finley.vpn",
     "productName": "Finley",
+    "directories": {
+      "output": "release"
+    },
     "files": [
-      "dist/**/*",
+      "dist/index.html",
+      "dist/assets/**/*",
+      "dist/finley-icon.*",
       "electron/**/*",
       "package.json"
     ],
     "win": {
       "target": "nsis",
+      "requestedExecutionLevel": "asInvoker",
       "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
+      "include": "build/installer.nsh"
     },
     "extraResources": [
       {
@@ -50,6 +60,8 @@
         "filter": [
           "sing-box.exe",
           "finley-tunnel-helper.exe",
+          "finley-tunnel-service.exe",
+          "finley-service-client.exe",
           "SING-BOX-LICENSE.txt"
         ]
       }
