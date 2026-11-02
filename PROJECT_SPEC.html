@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Finley VPN Client — Project Specification</title><style>body{font:16px/1.65 system-ui,-apple-system,Segoe UI,sans-serif;color:#1d2939;background:#f3f6fb;margin:0}main{max-width:960px;margin:40px auto;padding:48px 64px;background:white;border:1px solid #e3eaf2;border-radius:18px;box-shadow:0 12px 40px #1d29390d}h1{font-size:2.5rem;line-height:1.15;color:#102b4f;margin:0 0 1rem}h2{font-size:1.45rem;color:#15385f;margin:2.4rem 0 .6rem;padding-bottom:.4rem;border-bottom:1px solid #e1eaf3}h3{font-size:1.1rem;color:#244d75;margin-top:1.5rem}li{margin:.45rem 0}a{color:#075db1}code{background:#eef4fb;padding:.1rem .3rem;border-radius:4px;font-size:.9em}strong{color:#172d47}@media(max-width:650px){main{margin:0;padding:28px 22px;border:0;border-radius:0}h1{font-size:2rem}}@media print{body{background:white}main{margin:0;padding:0;border:0;box-shadow:none;max-width:none}h2,h3{break-after:avoid}li{break-inside:avoid}}</style></head><body><main>
+<h1>Finley VPN Client — Project Specification</h1>
+<p><strong>Status:</strong> Planning baseline · <strong>Version:</strong> 1.0 · <strong>Date:</strong> 2026-10-30</p>
+<h2>1. Product overview</h2>
+<p>Finley is a Windows desktop VPN client inspired by Outline&#x27;s straightforward connection experience. A user brings an access key from an existing Outline-compatible server, connects their PC, and can exclude selected applications from the tunnel. Finley does not provide accounts, sell access, or host VPN servers.</p>
+<p><strong>MVP outcome:</strong> A user can import a supported key, connect reliably, see the active protocol, choose apps, domains, or IPv4 addresses and ranges to bypass the tunnel, and disconnect cleanly.</p>
+<p><strong>Target users:</strong> Individuals using Windows PCs who already have an Outline server access key and want a simple way to exclude particular apps from VPN routing.</p>
+<h2>2. Scope and success criteria</h2>
+<ul>
+<li>Support 64-bit Windows 10 and Windows 11, subject to the chosen engine&#x27;s supported releases. Confirm the exact minimum Windows builds during the feasibility spike.</li>
+<li>Accept standard Shadowsocks <code>ss://</code> access keys compatible with the selected engine, including standard URI encoding and optional labels. Report unsupported ciphers or key forms clearly; never silently change the configuration.</li>
+<li>Store and manage multiple named server entries; connect to one at a time. Paste a key, preview its non-secret details, add it, rename it, and remove it with confirmation.</li>
+<li>Connect and disconnect with clear Connecting, Connected, Disconnecting, Disconnected, and Error states. Show actionable error messages and allow retry.</li>
+<li>Display the actual configured proxy protocol as Shadowsocks and show cipher and TCP/UDP transport availability only when verified from the active configuration and engine. Do not claim an independently verified encryption or transport state without evidence.</li>
+<li>Provide optional bypass rules for selected applications, domains and subdomains, and IPv4 addresses or CIDR ranges; matching supported traffic uses the ordinary network path and other supported traffic goes through the tunnel. Bypass is off by default and applies only while connected.</li>
+<li>Deliver an installable Windows application with a simple interface, accessible labels, keyboard operation, and clear progress feedback.</li>
+<li>Acceptance requires real-server tests proving connection, app-specific routing, correct protocol display, disconnect cleanup, and recovery on supported Windows versions. A working UI alone is not sufficient.</li>
+</ul>
+<h2>3. Out of scope for v1</h2>
+<ul>
+<li>Hosting, provisioning, or administering servers; account, subscription, billing, or key issuance services.</li>
+<li>Dynamic <code>ssconf://</code> or HTTPS access keys, Outline advanced YAML transports, mobile or macOS clients, and automatic server selection.</li>
+<li>Kill switch, automatic updates, traffic statistics, and localization; these may be considered after the MVP. The UI must not imply kill-switch protection.</li>
+</ul>
+<h2>4. Core user stories and flows</h2>
+<ol>
+<li><strong>Add a server:</strong> The user pastes an <code>ss://</code> key, reviews a name and non-secret connection details, and saves it. Invalid, unsupported, or dynamic keys receive a clear explanation without revealing credentials.</li>
+<li><strong>Connect:</strong> The user selects a saved server and chooses Connect. Finley shows progress, then the confirmed connection state and protocol details; failures show a useful message and Retry.</li>
+<li><strong>Configure bypass:</strong> The user enables bypass, selects an installed application or browses for its executable, and saves the list. Finley shows which apps bypass the VPN and explains that their traffic uses the regular network. Apply changes on reconnect unless the chosen engine can safely apply them live and this is verified.</li>
+<li><strong>Disconnect and manage:</strong> The user disconnects, edits a server name, or removes a server. Removing the active server first disconnects it. Closing the app disconnects and cleans up networking unless a future tray mode is explicitly designed.</li>
+</ol>
+<h2>5. Functional requirements</h2>
+<h3>Connection and key handling</h3>
+<ul>
+<li>Parse and validate the key locally. Verify scheme, endpoint, port, supported cipher, and required credentials without printing or displaying secrets. Accept common encoded and plaintext standard Shadowsocks URI forms supported by the selected engine.</li>
+<li>Treat <code>ssconf://</code>, HTTPS dynamic keys, advanced configuration, unknown methods, and malformed keys as unsupported or invalid with specific, safe feedback. Do not fetch untrusted URLs as an alternate import path.</li>
+<li>Keep profiles and preferences locally; encrypt credentials at rest using Windows user-scoped DPAPI or an equivalent Windows credential store. Do not place raw keys in logs, diagnostics, or crash reports.</li>
+<li>Connect only after required permissions and networking dependencies are available. Distinguish invalid configuration, unreachable server, permission failure, and networking-engine failure when the engine provides sufficient evidence.</li>
+<li>Show Connected only after the engine reports an active tunnel and a connectivity check succeeds; a check failure must be reported honestly rather than proof of server compromise. Do not claim that an IP address or geographic location has changed unless measured.</li>
+<li>On disconnect, application exit, failed setup, or recovery from a crash, remove only Finley&#x27;s own routes, interfaces, and processes. Preserve unrelated network configuration. Provide a recoverable error if cleanup fails.</li>
+</ul>
+<h3>Bypass rules</h3>
+<ul>
+<li>Select applications from a best-effort installed-app list or by browsing to an <code>.exe</code>; identify rules by normalized executable path and show a readable name and path. Avoid duplicates and allow removal. Preserve the list across restarts.</li>
+<li>Present bypass as direct routing with a privacy warning next to the setting. Do not claim it covers child processes, packaged apps, elevated processes, or all traffic until verified for the selected engine; document confirmed limitations in the UI and release notes.</li>
+<li>Preserve normal tunnel routing for other supported traffic. Clearly state DNS and IPv6 behavior verified during the feasibility spike; prevent accidental silent fallback to direct routing if a required routing rule cannot be enforced.</li>
+<li>App rules are local to this Windows user and do not change the server. Existing connections may need to be restarted; tell the user when a reconnect is needed.</li>
+</ul>
+<h3>Experience and privacy</h3>
+<ul>
+<li>The main screen shows the selected server, state, primary Connect/Disconnect action, protocol details, and navigation to servers and bypass settings. Never display the server password or full key after import.</li>
+<li>Include empty, loading, permission, unsupported-key, connection-failure, and cleanup-failure states. Provide concise recovery steps.</li>
+<li>Store no usage analytics or remote logs by default. Local diagnostic logs must omit credentials and be safe to clear; show a user-readable error without exposing secrets.</li>
+</ul>
+<h2>6. Architecture and technical decisions</h2>
+<ul>
+<li><strong>Desktop shell:</strong> Electron with React, TypeScript, and Vite; local UI only. Use Electron security defaults: context isolation, sandbox where supported, no Node integration in the renderer, and a narrow validated preload/IPC API.</li>
+<li><strong>Networking:</strong> Integrate a maintained Windows-capable tunnel engine as a separate native process or service; do not implement cryptography or packet routing from scratch. Evaluate license, redistribution, Windows support, Shadowsocks compatibility, TUN routing, per-process matching, DNS, IPv6, privilege and cleanup behavior before selection. Engine choice is gated by evidence and is not yet a promise of compatibility.</li>
+<li><strong>Process boundary:</strong> Renderer requests validated actions from the desktop main process. Main process owns profile persistence, Windows credential protection, engine lifecycle, and status events. The engine receives only the configuration it needs; restrict access to generated configuration and remove temporary secrets promptly.</li>
+<li><strong>Data:</strong> Local profile metadata contains an ID, display name, endpoint, method, and reference to a protected secret; preferences contain the bypass enabled flag and executable paths. No database or backend is required for MVP. Never include credentials in UI event payloads or logs.</li>
+<li><strong>Proposed internal interface:</strong> <code>listProfiles</code>, <code>addProfile(key, name)</code>, <code>renameProfile</code>, <code>removeProfile</code>, <code>connect(profileId)</code>, <code>disconnect</code>, <code>getStatus</code>, <code>getBypassSettings</code>, <code>setBypassSettings</code>, and status-change events. Validate all inputs and return typed, sanitized errors. This is an internal IPC contract, not a public network API.</li>
+<li><strong>Privileges:</strong> Determine the minimum privilege and installation model during the spike. Explain any Windows UAC prompt before it appears; do not run the entire UI elevated by default. Restrict any privileged service or helper to authenticated, validated local requests.</li>
+</ul>
+<h2>7. Feasibility gate and delivery tasks</h2>
+<ol>
+<li><strong>Networking spike:</strong> Compare candidate engines against the requirements above. With a real Outline server, verify supported standard keys and ciphers, full-tunnel routing, executable matching, TCP/UDP, DNS, IPv4/IPv6, existing and new connections, cleanup, and behavior under privilege changes. Record versions, license obligations, findings, and limitations.</li>
+<li><strong>Gate decision:</strong> Proceed only if the engine can demonstrate reliable app bypass and safe cleanup on both target Windows versions. If not, document the failed cases and revise scope or engine selection before implementation; do not market a partial result as full bypass.</li>
+<li><strong>Foundation:</strong> Set up the desktop shell, strict TypeScript, formatting, build pipeline, local persistence, protected secrets, and a narrow IPC boundary.</li>
+<li><strong>Connection:</strong> Add key validation and profile management, integrate the selected engine, implement connection states, protocol display, sanitized errors, and cleanup.</li>
+<li><strong>Bypass and UX:</strong> Add app discovery and executable selection, persisted rules, clear privacy and reconnect notices, and accessible states.</li>
+<li><strong>Release:</strong> Perform the checks below, package a Windows installer, review license notices and signing, and publish only after real-machine acceptance.</li>
+</ol>
+<h2>8. Testing and acceptance checklist</h2>
+<ul>
+<li><strong>Keys and profiles:</strong> Test valid supported encoded and plaintext <code>ss://</code> keys, optional labels, invalid ports, malformed encoding, unsupported methods, and dynamic keys. Verify multiple profiles, rename, remove, persistence, and no plaintext credentials in storage or logs.</li>
+<li><strong>Connection:</strong> Against a real Outline server, connect, browse through the tunnel, confirm displayed protocol/cipher against the active configuration, disconnect, reconnect, and test unreachable server, wrong credential, missing permission, and engine crash. Ensure state and errors reflect actual results.</li>
+<li><strong>Bypass:</strong> Compare observed traffic for a selected app and an unselected app using controlled endpoints. Test TCP and UDP where supported, DNS and IPv6 behavior, app restart, rule changes, duplicate and missing executables, multiple apps, and the documented limitations. Verify a failed rule does not silently route protected traffic directly.</li>
+<li><strong>Lifecycle:</strong> Test app exit, interrupted connection, reboot or process termination, and recovery; verify Finley removes its own routes, processes, and temporary files without damaging unrelated networking.</li>
+<li><strong>Windows and UX:</strong> Test clean install, upgrade, uninstall, keyboard navigation, permission prompts, and normal and elevated apps on supported Windows 10 and 11 builds. Test both Wi-Fi and Ethernet where practical.</li>
+<li><strong>Security:</strong> Review IPC validation, secret storage and redaction, local helper access, dependency licenses, and absence of unnecessary remote services. Verify no credentials appear in error reports or installer artifacts.</li>
+</ul>
+<h2>9. Deployment and operations</h2>
+<ul>
+<li>Build and test a versioned 64-bit Windows installer on a clean Windows machine; include third-party notices and dependency versions.</li>
+<li>Sign the executable and installer with a trusted certificate when available. Until then, clearly document Windows reputation warnings and provide a checksum through the distribution channel.</li>
+<li>Verify install, connect, bypass, disconnect, upgrade, and uninstall on both supported Windows versions. Uninstall must remove Finley&#x27;s components and restore its network changes; ask before deleting saved user data.</li>
+<li>Distribute through a controlled download location. No backend infrastructure or recurring hosting is required for the client; server and code-signing costs depend on the operator and distribution choices.</li>
+</ul>
+<h2>10. Risks and next improvements</h2>
+<ul>
+<li><strong>Per-app bypass is the main technical risk:</strong> Windows process attribution, helper processes, DNS, IPv6, and network changes can complicate accurate routing. Verify actual behavior before promising coverage.</li>
+<li><strong>Compatibility:</strong> Outline advanced and dynamic configurations are not equivalent to every ordinary Shadowsocks key. Explicitly show unsupported formats and cipher restrictions.</li>
+<li><strong>Privacy:</strong> Bypassed applications expose their traffic to the normal network. Without a kill switch, connectivity may revert when the tunnel fails; make the behavior clear and test it.</li>
+<li><strong>Maintenance:</strong> Networking drivers, privileged helpers, Windows updates, and unsigned binaries increase support costs. Pin and review dependencies, track upstream security fixes, and keep recovery simple.</li>
+<li><strong>Phase 2 candidates:</strong> dynamic Outline keys, broader transport support, optional kill switch, tray controls, automatic updates, localization, and optional usage metrics only with explicit consent.</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/OutlineFoundation/outline-apps">Outline Client and Manager repository</a></li>
+<li><a href="https://developer.getoutline.org/vpn/management/dynamic-access-keys/">Outline dynamic access keys documentation</a></li>
+<li><a href="https://github.com/OutlineFoundation/outline-apps/issues/1206">Outline per-process split tunneling feature request</a></li>
+</ul>
+<h2>Bypass scope update — 2026-10-30</h2><ul><li>Support applications, domains, and IPv4 addresses or CIDR ranges. Any matching enabled rule uses the regular connection.</li><li>example.com includes the root domain and every subdomain. Normalize names and reject URLs, ports, and wildcards.</li><li>Single IPv4 addresses become /32 rules; CIDRs become network addresses. IPv6 bypass is unavailable.</li><li>Persist all rule lists and apply changes after reconnecting. Older settings get empty domain and CIDR lists.</li><li>Domain matching needs a visible HTTP, TLS, or QUIC hostname. Hidden hostnames and unsupported protocols may remain tunneled. Verify routing and cleanup before release.</li></ul><h2>Bypass implementation and validation — 2026-10-30</h2><ul><li>Selected executable paths, domain suffixes, and IPv4 addresses or CIDR ranges use the regular network. Domains include subdomains; a single IPv4 address uses a /32 rule.</li><li>Executable paths match exactly without case sensitivity. Direct traffic uses the active IPv4 default interface selected before connecting. Reconnect after changing rules or network interfaces.</li><li>Finley handles DNS before application rules. Domain matching relies on visible HTTP, TLS, or QUIC hostnames; hidden hostnames and unsupported protocols may remain tunneled. IPv6 bypass is unavailable. Helper and child processes may need separate executable rules.</li><li>Controlled tests on this PC confirmed selected app, root domain, subdomain, and IPv4 CIDR traffic used the regular connection while unrelated traffic used the VPN. The user also confirmed Telegram, domain, and single IPv4 bypass work. Further testing across apps, protocols, DNS configurations, networks, and Windows 10 and 11 remains required.</li></ul></main></body></html>

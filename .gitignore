@@ -1,0 +1,10 @@
+node_modules/
+dist/
+release/
+*.log
+# Local diagnostic scripts use personal application profiles and are not part of the public distribution.
+tests/manual-*.cjs
+tests/storage-check.cjs
+tests/storage-roundtrip.cjs
+tests/identity.cjs
+design-concepts/
